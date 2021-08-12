@@ -25,7 +25,7 @@ from contours import crop_gray_image_by_contours
 
 # static variable
 threshold = 0.65
-rotates = [20, 10, 0, -10, -20]
+rotates = [20, 15, 10, 5, 0, -5, -10, -15, -20]
 initial_places = [(0, 6), (1, 8), (2, 8), (5, 8), (4, 8), (1, 7), (7, 7)]
 initial_places = [(0, 2), (0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (1, 1), (7, 1)]
 initial_places = [(0, 8)] # (0, 6), , (2, 8), (5, 8), (4, 8), (1, 7), (7, 7)
@@ -34,10 +34,19 @@ komas = ["koma/fu.png", "koma/kyo.png", "koma/kei.png", "koma/kin.png", "koma/gi
 komas = [("koma/fu.png", 9), ("koma/kyo.png", 2), ("koma/kei.png", 2), ("koma/kin.png", 2), ("koma/gin.png", 2), ("koma/ka.png", 1), ("koma/hi.png", 1), ("koma/ou.png", 1),
          ("koma/vfu.png", 9), ("koma/vkyo.png", 2), ("koma/vkei.png", 2), ("koma/vkin.png", 2), ("koma/vgin.png", 2), ("koma/vka.png", 1), ("koma/vhi.png", 1), ("koma/vou.png", 1)] #
 
+komas = [("koma/fu.jpg",  9, [(18, 23), (3, 187), (189, 189), (141, 22), (79, 4)]),
+         ("koma/kyo.jpg", 2, [(37, 18), (3, 192), (189, 200), (160, 26), (98, 3)]),
+         ("koma/kei.jpg", 2, [(57, 19), (3, 190), (196, 200), (194, 29), (132, 4)]),
+         ("koma/gin.jpg", 2, [(67, 21), (3, 206), (210, 213), (206, 31), (139, 6)]),
+         ("koma/kin.jpg", 2, [(23, 29), (5, 239), (237, 240), (182, 27), (96, 2)]),
+         ("koma/ka.jpg",  1, [(44, 24), (4, 245), (243, 252), (207, 31), (128, 3)]),
+         ("koma/hi.jpg",  1, [(53, 28), (2, 247), (237, 252), (212, 31), (135, 4)]),
+         ("koma/ou.jpg",  1, [(73, 30), (5, 250), (247, 256), (237, 32), (157, 5)])]
+
 # variable
 masu_size = 64
 ban_size = int(masu_size*9)
-folder = "/Users/satoakira/not-synced-picture/shogi-movie/20210809/"
+folder = "/Users/satoakira/not-synced-picture/shogi-movie/20210810/"
 target_img_path = folder + "2021-08-08_105400-0000.jpg"
 base_img_path = folder + "2021-08-08_105400-0000.jpg"
 # points = [(259, 104), (267, 694), (779, 686), (794, 115)]
@@ -83,64 +92,75 @@ cropped_base_img_gray = cv2.equalizeHist(cv2.cvtColor(cropped_base_img, cv2.COLO
 #     original_tmp.save(folder + "0005.jpg")
 
 for koma in komas:
-    for koma_size in [52, 50, 48, 45, 42, 40, 37, 35]:
+    for omoteura in [True, False]:
         # as debug
         original_tmp_cv2 = cv2.equalizeHist(cv2.cvtColor(cv2.imread(folder + koma[0]), cv2.COLOR_RGB2GRAY))
         h, w = original_tmp_cv2.shape[:2]
-        original_tmp_cv2 = cv2.rectangle(original_tmp_cv2, (0, 0), (w, h), (255, 255, 255), 10)
-        original_tmp = scale_to_height(cv2pil(original_tmp_cv2), koma_size)
-        original_tmp.save(folder + "0004.jpg")
+        # original_tmp_cv2 = cv2.rectangle(original_tmp_cv2, (0, 0), (w, h), (255, 255, 255), 10)
+        mask_cv2 = cv2.fillConvexPoly(np.zeros((h, w), dtype=np.uint8), np.array(koma[2]), (255, 255, 255))
+        for koma_size in [64, 62, 60, 58, 56, 54, 52, 50, 48, 47, 46, 45, 43, 44, 42, 40, 37, 35]:
+            mask = scale_to_height(cv2pil(mask_cv2), koma_size)
+            original_tmp = scale_to_height(cv2pil(original_tmp_cv2), koma_size)
+            if omoteura:
+                mask = mask.rotate(180)
+                original_tmp = original_tmp.rotate(180)
+            original_tmp.save(folder + "0004.jpg")
+            mask.save(folder + "0005.jpg")
+            rotated_gray_tmps = []
 
-        rotated_gray_tmps = []
+            for rotate in rotates:
+                rotated_tmp = original_tmp.rotate(angle=rotate, resample=Image.BICUBIC, expand=False) #, fillcolor=(255, 255, 255, 0))
+                rotated_mask = mask.rotate(angle=rotate, resample=Image.BICUBIC, expand=False) #, fillcolor=(255, 255, 255, 0))
+                h, w = rotated_tmp.size
+                # print(rotated_tmp.size)
+                cropped_tmp = rotated_tmp.crop((h * 0, w * 0, h * 1, w * 1))
+                cropped_mask = rotated_mask.crop((h * 0, w * 0, h * 1, w * 1))
+                # th, img = cv2.threshold(cv2.cvtColor(pil2cv(cropped_tmp), cv2.COLOR_RGB2GRAY), 128, 192, cv2.THRESH_OTSU)
+                # th, img = cv2.threshold(pil2cv(cropped_tmp), 127, 255, cv2.THRESH_OTSU)
+                # th, img = cv2.threshold(pil2cv(cropped_tmp), 127, 255, cv2.THRESH_BINARY)
+                # img = cv2.adaptiveThreshold(cv2.bitwise_not(pil2cv(cropped_tmp)), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 19, 2)
+                th, img = cv2.threshold(cv2.bitwise_not(pil2cv(cropped_tmp)), 127, 255, cv2.THRESH_BINARY)
+                img = cv2.bitwise_not(img)
+                cv2.imwrite(folder + "0001.jpg", img)
 
-        for rotate in rotates:
-            rotated_tmp = original_tmp.rotate(angle=rotate, resample=Image.BICUBIC, expand=False) #, fillcolor=(255, 255, 255, 0))
-            h, w = rotated_tmp.size
-            # print(rotated_tmp.size)
-            cropped_tmp = rotated_tmp.crop((h * 0, w * 0, h * 1, w * 1))
-            # th, img = cv2.threshold(cv2.cvtColor(pil2cv(cropped_tmp), cv2.COLOR_RGB2GRAY), 128, 192, cv2.THRESH_OTSU)
-            # th, img = cv2.threshold(pil2cv(cropped_tmp), 127, 255, cv2.THRESH_OTSU)
-            # th, img = cv2.threshold(pil2cv(cropped_tmp), 127, 255, cv2.THRESH_BINARY)
-            # img = cv2.adaptiveThreshold(cv2.bitwise_not(pil2cv(cropped_tmp)), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 19, 2)
-            th, img = cv2.threshold(cv2.bitwise_not(pil2cv(cropped_tmp)), 127, 255, cv2.THRESH_BINARY)
-            img = cv2.bitwise_not(img)
-            cv2.imwrite(folder + "0001.jpg", img)
+                img_mask = pil2cv(cropped_mask)
+                cv2.imwrite(folder + "0006.jpg", img_mask)
 
-            h, w = img.shape[:2]
-            mask = np.zeros((h + 2, w + 2), dtype=np.uint8)
-            retval, img, mask, rect = cv2.floodFill(img, mask, seedPoint=(0, 0), newVal=(255, 255, 255))
-            retval, img, mask, rect = cv2.floodFill(img, mask, seedPoint=(w-1, 0), newVal=(255, 255, 255))
-            retval, img, mask, rect = cv2.floodFill(img, mask, seedPoint=(0, h-1), newVal=(255, 255, 255))
-            retval, img, mask, rect = cv2.floodFill(img, mask, seedPoint=(w-1, h-1), newVal=(255, 255, 255))
+                # h, w = img.shape[:2]
+                # mask = np.zeros((h + 2, w + 2), dtype=np.uint8)
+                # retval, img, mask, rect = cv2.floodFill(img, mask, seedPoint=(0, 0), newVal=(255, 255, 255))
+                # retval, img, mask, rect = cv2.floodFill(img, mask, seedPoint=(w-1, 0), newVal=(255, 255, 255))
+                # retval, img, mask, rect = cv2.floodFill(img, mask, seedPoint=(0, h-1), newVal=(255, 255, 255))
+                # retval, img, mask, rect = cv2.floodFill(img, mask, seedPoint=(w-1, h-1), newVal=(255, 255, 255))
 
-            rotated_gray_tmps.append(img)
+                rotated_gray_tmps.append((img, img_mask))
 
-        locs = []
-        for temp in rotated_gray_tmps:
-            cv2.imwrite(folder + "0002.jpg", temp)
-            h, w = temp.shape
-            match = cv2.matchTemplate(gray, temp, cv2.TM_CCOEFF_NORMED)
-            loc = np.where(match >= threshold)
-            # print(loc)
-            locs.append(loc)
+            locs = []
+            for (temp, cropped_mask) in rotated_gray_tmps:
+                cv2.imwrite(folder + "0002.jpg", temp)
+                h, w = temp.shape
+                match = cv2.matchTemplate(gray, temp, cv2.TM_CCOEFF_NORMED, mask=cropped_mask)
+                loc = np.where(match >= threshold)
+                # print(loc)
+                locs.append(loc)
 
-        found_places = []
-        found_locs = []
+            found_places = []
+            found_locs = []
 
-        for loc in locs:
-            for pt in zip(*loc[::-1]):
-                found_place = (int((pt[0] + w/2)/masu_size), int((pt[1] + h/2)/masu_size))
-                found_places.append(found_place)
-                found_locs.append(pt)
-                # cv2.rectangle(saveimg, pt, (pt[0] + w, pt[1] + h), (0, 0, 255), 2)
+            for loc in locs:
+                for pt in zip(*loc[::-1]):
+                    found_place = (int((pt[0] + w/2)/masu_size), int((pt[1] + h/2)/masu_size))
+                    found_places.append(found_place)
+                    found_locs.append(pt)
+                    # cv2.rectangle(saveimg, pt, (pt[0] + w, pt[1] + h), (0, 0, 255), 2)
 
-        if len(set(found_places)) == koma[1]:
-            print(koma, koma_size)
-            # print("found_place.size = " + str(len(found_places)))
-            # print("found_place.unique.size = " + str(len(set(found_places))))
-            # print("found_place.unique.size is enough.")
-            for pt in found_locs:
-                cv2.rectangle(saveimg, pt, (pt[0] + w, pt[1] + h), (0, 0, 255), 2)
-            break
+            if len(set(found_places)) == koma[1]:
+                print(koma, koma_size)
+                # print("found_place.size = " + str(len(found_places)))
+                # print("found_place.unique.size = " + str(len(set(found_places))))
+                # print("found_place.unique.size is enough.")
+                for pt in found_locs:
+                    cv2.rectangle(saveimg, pt, (pt[0] + w, pt[1] + h), (0, 0, 255), 2)
+                break
 
 cv2.imwrite(folder + "0003.jpg", saveimg)
